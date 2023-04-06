@@ -266,7 +266,14 @@ impl BinProcess {
         let output = self.child.take().unwrap().wait_with_output().await.unwrap();
         let status = output.status.code().unwrap_or_else(|| {
             panic!(
-                "Failed to get exit status, usually this indicates a SIGKILL was issued but it could also be a failure of the application to return an exit value. The actual signal that killed the process was {:?}",
+                r#"Failed to get exit status.
+The signal that killed the process was {:?}.
+Possible caues:
+* a SIGKILL was issued, something is going very wrong.
+* a SIGINT or SIGTERM was issued but the aplications handler aborted without returning an exit value. (The default handler does this)
+  If you are building a long running application you should handle SIGKILL and SIGTERM such that your application cleanly shutsdown and returns an exit value.
+  Consider referring to how the tokio-bin-process example uses https://docs.rs/tokio/latest/tokio/signal/unix/struct.Signal.html
+"#,
                 output.status.signal()
             )
         });
