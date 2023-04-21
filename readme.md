@@ -5,6 +5,8 @@ Allows your integration tests to run your application under a separate process a
 It is a little opinionated and by default will fail the test when a tracing warning or error occurs.
 However a specific warning or error can be allowed on a per test basis.
 
+## Usage
+
 Example usage for an imaginary database project named cooldb:
 
 ```rust
@@ -60,6 +62,17 @@ async fn test_some_functionality() {
         .await;
 }
 ```
+
+## Application side setup
+
+There is a non-trival amount of setup required in the application itself.
+You will need to:
+
+* Provide a way to set tracing to output in json mode
+* Handle panics as a `tracing::error!` in json mode.
+* Ensure SIGTERM cleanly shutsdown the application and exits with a return code
+
+The `cooldb` example crate is a complete demonstration of all these requirements.
 
 ## Future work
 
