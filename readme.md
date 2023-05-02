@@ -6,7 +6,7 @@
 
 Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
 
-To achieve this, it builds your application as a native binary,
+To achieve this, it locates or builds the applications executable,
 runs it with tokio-tracing in json mode,
 and then processes the json to both assert on the logs and display the logs in human readable form.
 
@@ -21,8 +21,9 @@ Example usage for an imaginary database project named cooldb:
 /// you'll want a helper like this as you'll be creating this in every integration test.
 async fn cooldb_process() -> BinProcess {
     // start the process
-    let mut process = BinProcess::start_with_args(
-        "cooldb", // The name of the crate in this workspace to run
+    let mut process = BinProcess::start_binary(
+        // Locate the path to the cooldb binary from an integration test or benchmark
+        bin_path!("cooldb"),
         "cooldb", // The name that BinProcess should prepend its forwarded logs with
         &[
             // provide any custom CLI args required
@@ -31,7 +32,6 @@ async fn cooldb_process() -> BinProcess {
             // so configure the application to produce that.
             "--log-format", "json"
         ],
-        None
     )
     .await;
 
@@ -71,6 +71,12 @@ async fn test_some_functionality() {
         .await;
 }
 ```
+
+When cargo builds integration tests or benchmarks it provides a path to the binary under test.
+We can make use of that for speed and robustness as exampled here `cooldb/tests/test.rs`.
+
+But that is not always flexible enough so as a fallback BinProcess can invoke cargo again internally to ensure the binary we need is compiled as exampled here: `tokio-bin-process/tests/test.rs`
+For more details on different use cases refer to: <https://docs.rs/tokio-bin-process/latest/tokio_bin_process/struct.BinProcess.html>
 
 ## Application side setup
 

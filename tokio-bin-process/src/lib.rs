@@ -1,6 +1,6 @@
 //! Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
 //!
-//! To achieve this, it builds your application as a native binary,
+//! To achieve this, it locates or builds the applications executable,
 //! runs it with tokio-tracing in json mode,
 //! and then processes the json to both assert on the logs and display the logs in human readable form.
 //!
@@ -10,16 +10,24 @@
 //! Example usage for an imaginary database project named cooldb:
 //!
 //! ```rust
-//! /// you'll want a helper like this as you'll be creating this in every integration test.
 //! use tokio_bin_process::event::Level;
-//! use tokio_bin_process::BinProcess;
+//! use tokio_bin_process::{BinProcess, bin_path};
 //! use tokio_bin_process::event_matcher::EventMatcher;
 //! use std::time::Duration;
+//! use std::path::PathBuf;
+//! # // hack to make the doc test compile
+//! # macro_rules! bin_path {
+//! #     ($bin_name:expr) => {
+//! #         &std::path::Path::new("foo")
+//! #     };
+//! # }
 //!
+//! /// you'll want a helper like this as you'll be creating this in every integration test.
 //! async fn cooldb_process() -> BinProcess {
 //!     // start the process
-//!     let mut process = BinProcess::start_with_args(
-//!         "cooldb", // The name of the crate in this workspace to run
+//!     let mut process = BinProcess::start_binary(
+//!         // Locate the path to the cooldb binary from an integration test or benchmark
+//!         bin_path!("cooldb"),
 //!         "cooldb", // The name that BinProcess should prepend its forwarded logs with
 //!         &[
 //!             // provide any custom CLI args required
@@ -28,7 +36,6 @@
 //!             // so configure the application to produce that
 //!             "--log-format", "json"
 //!         ],
-//!         None
 //!     )
 //!     .await;
 //!
@@ -68,8 +75,29 @@
 //!         .await;
 //! }
 //! ```
+//!
+//! When cargo builds integration tests or benchmarks it provides a path to the binary under test.
+//! We can make use of that for speed and robustness with [`BinProcess::start_binary`].
+//!
+//! But that is not always flexible enough so as a fallback BinProcess can invoke cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_crate_name`].
 pub mod event;
 pub mod event_matcher;
 mod process;
 
 pub use process::BinProcess;
+
+/// When called from within an integration test or benchmark, returns the path to the binary with the specified crate name in the current package.
+///
+/// Whenever cargo compiles a benchmark or integration test any binary crates in the same package will also be compiled.
+/// This macro returns the path to one of those compiled binaries.
+/// If no such binary exists then the macro will fail to compile.
+///
+/// For example:
+/// There is a test at `test/tests.rs` for a binary crate with `name="foo"` in its `Cargo.toml` and with a `src/bin/bar.rs`.
+/// Inside the test at `test/tests.rs`, both `bin_path!("foo")` and `bin_path!("bar")` would compile and return the path of their respective binaries.
+#[macro_export]
+macro_rules! bin_path {
+    ($bin_name:expr) => {
+        &std::path::Path::new(std::env!(concat!("CARGO_BIN_EXE_", $bin_name)))
+    };
+}
