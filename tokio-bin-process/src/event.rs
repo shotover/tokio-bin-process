@@ -76,9 +76,16 @@ impl Display for Event {
         write!(
             f,
             "{}",
-            // Strip the date from the datetime.
-            // The date portion isnt useful in integration tests
-            Color::Default.dimmed().paint(&self.timestamp[11..])
+            Color::Default.dimmed().paint(
+                // If timestamp in expected rfc3339 format then strip the date from the datetime.
+                // The date portion isnt useful in integration tests.
+                if chrono::DateTime::parse_from_rfc3339(&self.timestamp).is_ok() {
+                    // Now that we have confirmed it as an rfc3339 date we can take the easy path of just stripping the date prefix.
+                    &self.timestamp[11..]
+                } else {
+                    &self.timestamp
+                }
+            )
         )?;
 
         if let Some(backtrace) = self.fields.fields.get("panic.backtrace") {
