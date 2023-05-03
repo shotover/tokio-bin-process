@@ -1,6 +1,7 @@
 use crate::event::{Event, Fields, Level};
 use crate::event_matcher::{Count, EventMatcher, Events};
 use anyhow::{anyhow, Context, Result};
+use itertools::Itertools;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use nu_ansi_term::Color;
@@ -162,17 +163,29 @@ impl BinProcess {
         panic!("bin process shutdown before an event was found matching {ready:?}")
     }
 
-    /// TODO: I can imagine lots of scenarios where a method like this would be really useful for integration testing.
-    ///       I havent implemented it yet because I dont yet have anywhere to use it.
-    ///
     /// Await `event_count` messages to be emitted from the process.
-    #[allow(dead_code)]
-    async fn consume_events(
-        &self,
-        _event_count: usize,
-        _expected_errors_and_warnings: &[EventMatcher],
+    /// The emitted events are returned.
+    pub async fn consume_events(
+        &mut self,
+        event_count: usize,
+        expected_errors_and_warnings: &[EventMatcher],
     ) -> Events {
-        todo!()
+        let mut events = vec![];
+        for _ in 0..event_count {
+            match self.event_rx.recv().await {
+                Some(event) => events.push(event),
+                None => {
+                    if events.is_empty() {
+                        panic!("The process was terminated before the expected count of {event_count} events occured. No events received so far");
+                    } else {
+                        let events_received = events.iter().map(|x| format!("{x}")).join("\n");
+                        panic!("The process was terminated before the expected count of {event_count} events occured. Events received so far:\n{events_received}");
+                    }
+                }
+            }
+        }
+        BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
+        Events { events }
     }
 
     /// Issues sigterm to the process and then awaits its shutdown.
@@ -222,17 +235,12 @@ impl BinProcess {
         events
     }
 
-    async fn consume_remaining_events_inner(
-        &mut self,
+    fn assert_no_errors_or_warnings(
+        events: &[Event],
         expected_errors_and_warnings: &[EventMatcher],
-    ) -> (Events, i32) {
-        let mut events = vec![];
-        while let Some(event) = self.event_rx.recv().await {
-            events.push(event);
-        }
-
+    ) {
         let mut error_count = vec![0; expected_errors_and_warnings.len()];
-        for event in &events {
+        for event in events {
             if let Level::Error | Level::Warn = event.level {
                 let mut matched = false;
                 for (matcher, count) in expected_errors_and_warnings
@@ -261,6 +269,18 @@ impl BinProcess {
                 }
             }
         }
+    }
+
+    async fn consume_remaining_events_inner(
+        &mut self,
+        expected_errors_and_warnings: &[EventMatcher],
+    ) -> (Events, i32) {
+        let mut events = vec![];
+        while let Some(event) = self.event_rx.recv().await {
+            events.push(event);
+        }
+
+        BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
 
         use std::os::unix::process::ExitStatusExt;
         let output = self.child.take().unwrap().wait_with_output().await.unwrap();

@@ -10,7 +10,7 @@ pub struct Events {
 }
 
 impl Events {
-    pub fn contains(&self, matcher: &EventMatcher) {
+    pub fn assert_contains(&self, matcher: &EventMatcher) {
         if !self.events.iter().any(|e| matcher.matches(e)) {
             panic!(
                 "An event with {matcher:?} was not found in the list of events:\n{}",
@@ -20,7 +20,7 @@ impl Events {
     }
 
     #[allow(dead_code)]
-    fn contains_in_order(&self, _matchers: &[EventMatcher]) {
+    fn assert_contains_in_order(&self, _matchers: &[EventMatcher]) {
         todo!()
     }
 }

@@ -74,5 +74,7 @@ pub fn init_tracing(format: LogFormat) -> WorkerGuard {
 async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>) {
     tracing::info!("accepting inbound connections");
 
+    tracing::info!("some functionality occurs");
+
     trigger_shutdown_rx.changed().await.unwrap();
 }
