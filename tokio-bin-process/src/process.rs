@@ -77,6 +77,12 @@ impl BinProcess {
         // PROFILE is set in build.rs from PROFILE listed in https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
         let release = env!("PROFILE") == "release";
 
+        let project_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .to_path_buf();
+
         // First build the binary if its not yet built
         let mut built_packages = BUILT_PACKAGES.lock().unwrap();
         if !built_packages.contains(cargo_package_name) {
@@ -85,15 +91,9 @@ impl BinProcess {
             } else {
                 vec!["build", "--all-features"]
             };
-            run_command(env!("CARGO"), &all_args).unwrap();
+            run_command(&project_root, env!("CARGO"), &all_args).unwrap();
             built_packages.insert(cargo_package_name.to_owned());
         }
-
-        let project_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .ancestors()
-            .nth(1)
-            .unwrap()
-            .to_path_buf();
 
         // Now actually run the binary and keep hold of the child process
         let bin_path = project_root
@@ -303,9 +303,10 @@ async fn process_stdout_events(
 
 /// Runs a command and returns the output as a string.
 /// Both stderr and stdout are returned in the result.
-fn run_command(command: &str, args: &[&str]) -> Result<String> {
+fn run_command(working_dir: &Path, command: &str, args: &[&str]) -> Result<String> {
     let data = Exec::cmd(command)
         .args(args)
+        .cwd(working_dir)
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Merge)
         .capture()?;
