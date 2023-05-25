@@ -275,6 +275,11 @@ impl BinProcess {
         &mut self,
         expected_errors_and_warnings: &[EventMatcher],
     ) -> (Events, i32) {
+        // Take the child before we wait for the process to terminate.
+        // This ensures that the drop bomb wont go off if the future is dropped partway through.
+        // e.g. the user might have run BinProcess through `tokio::time::timeout`
+        let child = self.child.take().unwrap();
+
         let mut events = vec![];
         while let Some(event) = self.event_rx.recv().await {
             events.push(event);
@@ -283,7 +288,7 @@ impl BinProcess {
         BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
 
         use std::os::unix::process::ExitStatusExt;
-        let output = self.child.take().unwrap().wait_with_output().await.unwrap();
+        let output = child.wait_with_output().await.unwrap();
         let status = output.status.code().unwrap_or_else(|| {
             panic!(
                 r#"Failed to get exit status.
