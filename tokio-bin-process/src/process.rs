@@ -19,13 +19,20 @@ use tokio::{
 };
 use tracing_subscriber::fmt::TestWriter;
 
+#[derive(Hash, PartialEq, Eq)]
+struct BuiltPackage {
+    name: String,
+    profile: String,
+}
+
 // It is actually quite expensive to invoke `cargo build` even when there is nothing to build.
 // On my machine, on a specific project, it takes 170ms.
 // To avoid this cost for every call to start_with_args we use this global to keep track of which packages have been built by a BinProcess for the lifetime of the test run.
 //
 // Unfortunately this doesnt work when running each test in its own process. e.g. when using nextest
 // But worst case it just unnecessarily reruns `cargo build`.
-static BUILT_PACKAGES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static BUILT_PACKAGES: Lazy<Mutex<HashSet<BuiltPackage>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
 
 /// A running process of a binary produced by a crate in the workspace
 pub struct BinProcess {
@@ -54,6 +61,11 @@ impl BinProcess {
     /// Start the crate binary named `cargo_package_name` in a process and returns a BinProcess which can be used to interact with the process.
     /// The binary will be internally compiled by cargo if its not already, it will be compiled in a release/debug mode that matches the release/debug mode of the integration test.
     ///
+    /// The crate will be compiled with the cargo profile specified in `cargo_profile`.
+    /// When it is Some(_) the value specified is used.
+    /// When it is None it will use "release" if tokio-bin-process was compiled in a release derived profile or "dev" if it was compiled in a dev derived profile.
+    /// The reason None will only ever result in a "release" or "dev" profile is due to a limitation on what profile information cargo exposes to us.
+    ///
     /// The `user_args` will be used as the args to the binary.
     /// The args should give the desired setup for the given integration test and should also enable the tracing json logger to stdout if that is not the default.
     /// All tracing events emitted by your binary in json over stdout will be processed by BinProcess and then emitted to the tests stdout in the default human readable tracing format.
@@ -66,6 +78,7 @@ impl BinProcess {
         cargo_package_name: &str,
         log_name: &str,
         binary_args: &[&str],
+        cargo_profile: Option<&str>,
     ) -> BinProcess {
         setup_tracing_subscriber_for_test_logic();
 
@@ -76,7 +89,11 @@ impl BinProcess {
         };
 
         // PROFILE is set in build.rs from PROFILE listed in https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
-        let release = env!("PROFILE") == "release";
+        let profile = cargo_profile.unwrap_or(if env!("PROFILE") == "release" {
+            "release"
+        } else {
+            "dev"
+        });
 
         let project_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
             .ancestors()
@@ -86,20 +103,29 @@ impl BinProcess {
 
         // First build the binary if its not yet built
         let mut built_packages = BUILT_PACKAGES.lock().unwrap();
-        if !built_packages.contains(cargo_package_name) {
-            let all_args = if release {
-                vec!["build", "--all-features", "--release"]
-            } else {
-                vec!["build", "--all-features"]
-            };
+        let built_package = BuiltPackage {
+            name: cargo_package_name.to_owned(),
+            profile: profile.to_owned(),
+        };
+        if !built_packages.contains(&built_package) {
+            let all_args = vec!["build", "--all-features", "--profile", profile];
             run_command(&project_root, env!("CARGO"), &all_args).unwrap();
-            built_packages.insert(cargo_package_name.to_owned());
+            built_packages.insert(built_package);
         }
+
+        let target_profile_name = match profile {
+            // dev is mapped to debug for legacy reasons
+            "dev" => "debug",
+            // test and bench are hardcoded to reuse dev and release directories
+            "test" => "debug",
+            "bench" => "release",
+            profile => profile,
+        };
 
         // Now actually run the binary and keep hold of the child process
         let bin_path = project_root
             .join("target")
-            .join(if release { "release" } else { "debug" })
+            .join(target_profile_name)
             .join(cargo_package_name);
         let mut child = Some(
             Command::new(&bin_path)
