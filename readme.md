@@ -23,6 +23,7 @@ async fn cooldb_process() -> BinProcess {
             // so configure the application to produce that.
             "--log-format", "json"
         ],
+        None
     )
     .await;
 
