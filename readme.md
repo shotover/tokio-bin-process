@@ -1,6 +1,14 @@
 # tokio-bin-process
 
+[![Crates.io](https://img.shields.io/crates/v/tokio-bin-process.svg)](https://crates.io/crates/tokio-bin-process)
+[![Docs](https://docs.rs/tokio-bin-process/badge.svg)](https://docs.rs/tokio-bin-process)
+[![dependency status](https://deps.rs/repo/github/shotover/tokio-bin-process/status.svg)](https://deps.rs/repo/github/shotover/tokio-bin-process)
+
 Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
+
+To achieve this, it builds your application as a native binary,
+runs it with tokio-tracing in json mode,
+and then processes the json to both assert on the logs and display the logs in human readable form.
 
 It is a little opinionated and by default will fail the test when a tracing warning or error occurs.
 However a specific warning or error can be allowed on a per test basis.
@@ -74,8 +82,3 @@ You will need to:
 * Ensure SIGTERM cleanly shutsdown the application and exits with a return code
 
 The `cooldb` example crate is a complete demonstration of all these requirements.
-
-## Future work
-
-There is currently not yet a proper way to assert that events occured without first shutting down the process.
-There is a stub method `BinProcess::consume_events` indicating the design this should take.

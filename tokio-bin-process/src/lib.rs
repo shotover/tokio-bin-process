@@ -1,5 +1,9 @@
 //! Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
 //!
+//! To achieve this, it builds your application as a native binary,
+//! runs it with tokio-tracing in json mode,
+//! and then processes the json to both assert on the logs and display the logs in human readable form.
+//!
 //! It is a little opinionated and by default will fail the test when a tracing warning or error occurs.
 //! However a specific warning or error can be allowed on a per test basis.
 //!
