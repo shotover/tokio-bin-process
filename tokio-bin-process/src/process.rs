@@ -1,6 +1,7 @@
 use crate::event::{Event, Fields, Level};
 use crate::event_matcher::{Count, EventMatcher, Events};
 use anyhow::{anyhow, Context, Result};
+use cargo_metadata::{Metadata, MetadataCommand};
 use itertools::Itertools;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -19,6 +20,11 @@ use tokio::{
 };
 use tracing_subscriber::fmt::TestWriter;
 
+struct CargoCache {
+    metadata: Option<Metadata>,
+    built_packages: HashSet<BuiltPackage>,
+}
+
 #[derive(Hash, PartialEq, Eq)]
 struct BuiltPackage {
     name: String,
@@ -31,8 +37,13 @@ struct BuiltPackage {
 //
 // Unfortunately this doesnt work when running each test in its own process. e.g. when using nextest
 // But worst case it just unnecessarily reruns `cargo build`.
-static BUILT_PACKAGES: Lazy<Mutex<HashSet<BuiltPackage>>> =
-    Lazy::new(|| Mutex::new(HashSet::new()));
+// TODO: we might be able to use CARGO_TARGET_TMPDIR to fix for nextest
+static CARGO_CACHE: Lazy<Mutex<CargoCache>> = Lazy::new(|| {
+    Mutex::new(CargoCache {
+        metadata: None,
+        built_packages: HashSet::new(),
+    })
+});
 
 /// A running process of a binary produced by a crate in the workspace
 pub struct BinProcess {
@@ -95,23 +106,35 @@ impl BinProcess {
             "dev"
         });
 
-        let project_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .ancestors()
-            .nth(1)
-            .unwrap()
-            .to_path_buf();
-
         // First build the binary if its not yet built
-        let mut built_packages = BUILT_PACKAGES.lock().unwrap();
-        let built_package = BuiltPackage {
-            name: cargo_package_name.to_owned(),
-            profile: profile.to_owned(),
+        let target_dir = {
+            let mut cargo_cache = CARGO_CACHE.lock().unwrap();
+            if cargo_cache.metadata.is_none() {
+                cargo_cache.metadata = Some(MetadataCommand::new().exec().unwrap());
+            }
+            let built_package = BuiltPackage {
+                name: cargo_package_name.to_owned(),
+                profile: profile.to_owned(),
+            };
+            if !cargo_cache.built_packages.contains(&built_package) {
+                let all_args = vec!["build", "--all-features", "--profile", profile];
+                let metadata = cargo_cache.metadata.as_ref().unwrap();
+                run_command(
+                    metadata.workspace_root.as_std_path(),
+                    env!("CARGO"),
+                    &all_args,
+                )
+                .unwrap();
+                cargo_cache.built_packages.insert(built_package);
+            }
+
+            cargo_cache
+                .metadata
+                .as_ref()
+                .unwrap()
+                .target_directory
+                .clone()
         };
-        if !built_packages.contains(&built_package) {
-            let all_args = vec!["build", "--all-features", "--profile", profile];
-            run_command(&project_root, env!("CARGO"), &all_args).unwrap();
-            built_packages.insert(built_package);
-        }
 
         let target_profile_name = match profile {
             // dev is mapped to debug for legacy reasons
@@ -123,8 +146,7 @@ impl BinProcess {
         };
 
         // Now actually run the binary and keep hold of the child process
-        let bin_path = project_root
-            .join("target")
+        let bin_path = target_dir
             .join(target_profile_name)
             .join(cargo_package_name);
         let mut child = Some(
