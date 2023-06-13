@@ -4,7 +4,7 @@
 [![Docs](https://docs.rs/tokio-bin-process/badge.svg)](https://docs.rs/tokio-bin-process)
 [![dependency status](https://deps.rs/repo/github/shotover/tokio-bin-process/status.svg)](https://deps.rs/repo/github/shotover/tokio-bin-process)
 
-Allows your integration tests to run your application under a separate process and assert on `tracing` events.
+Allows your integration tests to run your application under a separate process and assert on [`tracing`](https://github.com/tokio-rs/tracing) events.
 
 To achieve this, it locates or builds the applications executable,
 runs it with `tracing` in JSON mode,
@@ -84,7 +84,7 @@ There is a non-trival amount of setup required in the application itself.
 You will need to:
 
 * Provide a way to set tracing to output in JSON mode.
-b* Handle panics as a `tracing::error!` in JSON mode.
+* Handle panics as a `tracing::error!` in JSON mode.
 * Ensure SIGTERM cleanly shutsdown the application and exits with a return code.
 
 The `cooldb` example crate is a complete demonstration of all these requirements.

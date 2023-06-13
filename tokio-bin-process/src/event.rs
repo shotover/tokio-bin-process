@@ -1,4 +1,4 @@
-//! Structures to represent an event created by `tracing`.
+//! Structures to represent an event created by [`tracing`](https://docs.rs/tracing).
 
 use anyhow::Context;
 use anyhow::Result;
