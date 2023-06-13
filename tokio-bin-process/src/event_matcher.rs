@@ -106,16 +106,11 @@ impl Default for Count {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 enum Matcher<T: PartialEq> {
     Matches(T),
+    #[default]
     Any,
-}
-
-impl<T: PartialEq> Default for Matcher<T> {
-    fn default() -> Self {
-        Matcher::Any
-    }
 }
 
 impl<T: PartialEq> Matcher<T> {

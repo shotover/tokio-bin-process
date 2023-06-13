@@ -2,7 +2,6 @@
 name = "tokio-bin-process"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.56"
 license = "Apache-2.0"
 description = "run your application under a separate process with tokio tracing assertions when integration testing"
 repository = "https://github.com/shotover/tokio-bin-process"
