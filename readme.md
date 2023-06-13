@@ -4,13 +4,13 @@
 [![Docs](https://docs.rs/tokio-bin-process/badge.svg)](https://docs.rs/tokio-bin-process)
 [![dependency status](https://deps.rs/repo/github/shotover/tokio-bin-process/status.svg)](https://deps.rs/repo/github/shotover/tokio-bin-process)
 
-Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
+Allows your integration tests to run your application under a separate process and assert on [`tracing`](https://github.com/tokio-rs/tracing) events.
 
 To achieve this, it locates or builds the applications executable,
-runs it with tokio-tracing in json mode,
-and then processes the json to both assert on the logs and display the logs in human readable form.
+runs it with `tracing` in JSON mode,
+and then processes the JSON to both assert on the logs and display the logs in human readable form.
 
-It is a little opinionated and by default will fail the test when a tracing warning or error occurs.
+It is a little opinionated and by default will fail the test when a `tracing` warning or error occurs.
 However a specific warning or error can be allowed on a per test basis.
 
 ## Usage
@@ -72,10 +72,10 @@ async fn test_some_functionality() {
 }
 ```
 
-When cargo builds integration tests or benchmarks it provides a path to the binary under test.
+When Cargo builds integration tests or benchmarks it provides a path to the binary under test.
 We can make use of that for speed and robustness as exampled here `cooldb/tests/test.rs`.
 
-But that is not always flexible enough so as a fallback BinProcess can invoke cargo again internally to ensure the binary we need is compiled as exampled here: `tokio-bin-process/tests/test.rs`
+But that is not always flexible enough so as a fallback `BinProcess` can invoke cargo again internally to ensure the binary we need is compiled as exampled here: `tokio-bin-process/tests/test.rs`
 For more details on different use cases refer to: <https://docs.rs/tokio-bin-process/latest/tokio_bin_process/struct.BinProcess.html>
 
 ## Application side setup
@@ -83,8 +83,8 @@ For more details on different use cases refer to: <https://docs.rs/tokio-bin-pro
 There is a non-trival amount of setup required in the application itself.
 You will need to:
 
-* Provide a way to set tracing to output in json mode
-* Handle panics as a `tracing::error!` in json mode.
-* Ensure SIGTERM cleanly shutsdown the application and exits with a return code
+* Provide a way to set tracing to output in JSON mode.
+* Handle panics as a `tracing::error!` in JSON mode.
+* Ensure SIGTERM cleanly shutsdown the application and exits with a return code.
 
 The `cooldb` example crate is a complete demonstration of all these requirements.
