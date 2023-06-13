@@ -1,10 +1,10 @@
-//! Allows your integration tests to run your application under a separate process and assert on tokio-tracing events.
+//! Allows your integration tests to run your application under a separate process and assert on [`tracing`](https://docs.rs/tracing) events.
 //!
-//! To achieve this, it locates or builds the applications executable,
-//! runs it with tokio-tracing in json mode,
-//! and then processes the json to both assert on the logs and display the logs in human readable form.
+//! To achieve this, it locates or builds the application's executable,
+//! runs it with `tracing` in JSON mode,
+//! and then processes the JSON logs to both assert on and display in human readable form.
 //!
-//! It is a little opinionated and by default will fail the test when a tracing warning or error occurs.
+//! It is a little opinionated and by default will fail the test when a `tracing` warning or error occurs.
 //! However a specific warning or error can be allowed on a per test basis.
 //!
 //! Example usage for an imaginary database project named cooldb:
@@ -76,10 +76,10 @@
 //! }
 //! ```
 //!
-//! When cargo builds integration tests or benchmarks it provides a path to the binary under test.
+//! When Cargo builds integration tests or benchmarks it provides a path to the binary under test.
 //! We can make use of that for speed and robustness with [`BinProcess::start_binary`].
 //!
-//! But that is not always flexible enough so as a fallback BinProcess can invoke cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_crate_name`].
+//! But that is not always flexible enough so as a fallback [`BinProcess`] can invoke Cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_crate_name`].
 pub mod event;
 pub mod event_matcher;
 mod process;
@@ -88,7 +88,7 @@ pub use process::BinProcess;
 
 /// When called from within an integration test or benchmark, returns the path to the binary with the specified crate name in the current package.
 ///
-/// Whenever cargo compiles a benchmark or integration test any binary crates in the same package will also be compiled.
+/// Whenever Cargo compiles a benchmark or integration test any binary crates in the same package will also be compiled.
 /// This macro returns the path to one of those compiled binaries.
 /// If no such binary exists then the macro will fail to compile.
 ///

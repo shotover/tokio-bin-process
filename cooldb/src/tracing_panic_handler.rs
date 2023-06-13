@@ -22,9 +22,9 @@ pub fn setup() {
     }));
 }
 
-/// The std::backtrace::Backtrace formatting is really noisy because it includes all the pre-main and panic handling frames.
-/// Internal panics have logic to remove that but that is missing from std::backtrace::Backtrace.
-/// https://github.com/rust-lang/rust/issues/105413
+/// The `std::backtrace::Backtrace` formatting is really noisy because it includes all the pre-main and panic handling frames.
+/// Internal panics have logic to remove that but that is missing from `std::backtrace::Backtrace`.
+/// <https://github.com/rust-lang/rust/issues/105413>
 ///
 /// As a workaround we use the backtrace crate and manually perform the required formatting
 struct BacktraceFormatter(Backtrace);
