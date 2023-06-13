@@ -1,4 +1,4 @@
-//! Structures to represent an event created by tokio tracing
+//! Structures to represent an event created by `tracing`.
 
 use anyhow::Context;
 use anyhow::Result;
@@ -8,15 +8,15 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-/// Represents an event created by tokio tracing.
+/// Represents an event created by `tracing`.
 ///
-/// It is not possible to construct one directly from a tracing event.
-/// Instead its expected that they are returned by one of the methods on tokio-bin-process which retrives them by parsing tracings json output.
+/// It is not possible to construct one directly from a `tracing` event.
+/// Instead its expected that they are returned by one of the methods on [`crate::BinProcess`] which retrives them by parsing `tracing`'s JSON output.
 #[derive(serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct Event {
-    /// The timestamp of the event
+    /// The timestamp of the event.
     pub timestamp: String,
-    /// The level of the event
+    /// The level of the event.
     pub level: Level,
     /// The target of the event, this is usually the module name of the code that triggered the event.
     pub target: String,
@@ -30,7 +30,7 @@ pub struct Event {
     pub spans: Vec<HashMap<String, JsonValue>>,
 }
 
-/// The level of the event
+/// The level of the `Event`.
 #[derive(serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum Level {
     #[serde(rename = "ERROR")]
@@ -61,12 +61,12 @@ impl Display for Level {
 #[derive(serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct Fields {
     /// The message of the event.
-    /// Some events dont have a message in which case this is an empty String.
+    /// Some events dont have a message in which case this is an empty `String`.
     #[serde(default)]
     pub message: String,
     /// All fields other than the message.
     /// For an event created by: `tracing::info!("message", some_field=4)`
-    /// This would contain the HashMap: `{"some_field", JsonValue::Number(4)}`
+    /// This would contain the `HashMap`: `{"some_field", JsonValue::Number(4)}`.
     #[serde(flatten)]
     pub fields: HashMap<String, JsonValue>,
 }
@@ -177,7 +177,7 @@ impl<'a> Display for QuotelessDisplay<'a> {
 }
 
 impl Event {
-    /// Constructs an Event by parsing a single event from tokio tracing's json output
+    /// Constructs an Event by parsing a single event from `tracing`'s JSON output.
     pub fn from_json_str(s: &str) -> Result<Self> {
         serde_json::from_str(s).context(format!("Failed to parse json: {s}"))
     }
