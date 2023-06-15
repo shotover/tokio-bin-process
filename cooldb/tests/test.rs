@@ -8,7 +8,7 @@ use tokio_bin_process::BinProcess;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb() {
     // Setup cooldb
-    let mut cooldb = cooldb().await;
+    let mut cooldb = cooldb("standard").await;
 
     // Assert that some functionality occured.
     // Use a timeout to prevent the test hanging if no events occur.
@@ -24,9 +24,29 @@ async fn test_cooldb() {
     cooldb.shutdown_and_then_consume_events(&[]).await;
 }
 
-async fn cooldb() -> BinProcess {
-    let mut cooldb =
-        BinProcess::start_binary(bin_path!("cooldb"), "cooldb", &["--log-format", "json"]).await;
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = r#"some error occurs
+Any ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call."#)]
+async fn test_cooldb_error_at_runtime() {
+    let cooldb = cooldb("error-at-runtime").await;
+    cooldb.shutdown_and_then_consume_events(&[]).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = r#"An error occurs during startup
+Any ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call."#)]
+async fn test_cooldb_error_at_startup() {
+    let cooldb = cooldb("error-at-startup").await;
+    cooldb.shutdown_and_then_consume_events(&[]).await;
+}
+
+async fn cooldb(mode: &str) -> BinProcess {
+    let mut cooldb = BinProcess::start_binary(
+        bin_path!("cooldb"),
+        "cooldb",
+        &["--log-format", "json", "--mode", mode],
+    )
+    .await;
 
     timeout(
         Duration::from_secs(30),
@@ -35,6 +55,7 @@ async fn cooldb() -> BinProcess {
                 .with_level(Level::Info)
                 .with_target("cooldb")
                 .with_message("accepting inbound connections"),
+            &[],
         ),
     )
     .await

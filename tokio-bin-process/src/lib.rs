@@ -47,6 +47,7 @@
 //!                 .with_level(Level::Info)
 //!                 .with_target("cooldb")
 //!                 .with_message("accepting inbound connections"),
+//!             &[]
 //!         ),
 //!     )
 //!     .await

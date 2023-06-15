@@ -303,12 +303,17 @@ impl BinProcess {
 
     /// Waits for the `ready` `EventMatcher` to match on an incoming event.
     /// All events that were encountered while waiting are returned.
-    pub async fn wait_for(&mut self, ready: &EventMatcher) -> Events {
+    pub async fn wait_for(
+        &mut self,
+        ready: &EventMatcher,
+        expected_errors_and_warnings: &[EventMatcher],
+    ) -> Events {
         let mut events = vec![];
         while let Some(event) = self.event_rx.recv().await {
             let ready_match = ready.matches(&event);
             events.push(event);
             if ready_match {
+                BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
                 return Events { events };
             }
         }
