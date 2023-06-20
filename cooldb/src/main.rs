@@ -13,11 +13,20 @@ pub enum LogFormat {
     Json,
 }
 
+#[derive(clap::ValueEnum, Clone, Copy)]
+pub enum Mode {
+    Standard,
+    ErrorAtRuntime,
+    ErrorAtStartup,
+}
+
 #[derive(Parser, Clone)]
 #[clap()]
 pub struct ConfigOpts {
     #[arg(long, value_enum, default_value = "human")]
     pub log_format: LogFormat,
+    #[arg(long, value_enum)]
+    pub mode: Mode,
 }
 
 #[tokio::main]
@@ -45,7 +54,7 @@ async fn main() {
         trigger_shutdown_tx.send(true).unwrap();
     });
 
-    db_logic(trigger_shutdown_rx).await;
+    db_logic(trigger_shutdown_rx, opts.mode).await;
 }
 
 pub fn init_tracing(format: LogFormat) -> WorkerGuard {
@@ -71,10 +80,17 @@ pub fn init_tracing(format: LogFormat) -> WorkerGuard {
     guard
 }
 
-async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>) {
+async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>, mode: Mode) {
+    if let Mode::ErrorAtStartup = mode {
+        tracing::error!("An error occurs during startup");
+    }
+
     tracing::info!("accepting inbound connections");
 
-    tracing::info!("some functionality occurs");
+    match mode {
+        Mode::Standard | Mode::ErrorAtStartup => tracing::info!("some functionality occurs"),
+        Mode::ErrorAtRuntime => tracing::error!("some error occurs"),
+    }
 
     trigger_shutdown_rx.changed().await.unwrap();
 }

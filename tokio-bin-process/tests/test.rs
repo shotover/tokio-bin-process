@@ -45,8 +45,13 @@ async fn test_cooldb_by_crate_name_bench_profile() {
 }
 
 async fn cooldb(profile: Option<&'static str>) -> BinProcess {
-    let mut cooldb =
-        BinProcess::start_crate_name("cooldb", "cooldb", &["--log-format", "json"], profile).await;
+    let mut cooldb = BinProcess::start_crate_name(
+        "cooldb",
+        "cooldb",
+        &["--log-format", "json", "--mode", "standard"],
+        profile,
+    )
+    .await;
 
     timeout(
         Duration::from_secs(30),
@@ -55,6 +60,7 @@ async fn cooldb(profile: Option<&'static str>) -> BinProcess {
                 .with_level(Level::Info)
                 .with_target("cooldb")
                 .with_message("accepting inbound connections"),
+            &[],
         ),
     )
     .await
