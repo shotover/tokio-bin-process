@@ -80,7 +80,7 @@
 //! When Cargo builds integration tests or benchmarks it provides a path to the binary under test.
 //! We can make use of that for speed and robustness with [`BinProcess::start_binary`].
 //!
-//! But that is not always flexible enough so as a fallback [`BinProcess`] can invoke Cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_crate_name`].
+//! But that is not always flexible enough so as a fallback [`BinProcess`] can invoke Cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_binary_name`].
 pub mod event;
 pub mod event_matcher;
 mod process;

@@ -5,7 +5,7 @@ use tokio_bin_process::event_matcher::EventMatcher;
 use tokio_bin_process::BinProcess;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cooldb_by_crate_name() {
+async fn test_cooldb_by_binary_name() {
     // Setup cooldb
     let mut cooldb = cooldb(None).await;
 
@@ -25,7 +25,7 @@ async fn test_cooldb_by_crate_name() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cooldb_by_crate_name_bench_profile() {
+async fn test_cooldb_by_binary_name_bench_profile() {
     // Setup cooldb with custom profile
     let mut cooldb = cooldb(Some("bench")).await;
 
@@ -45,7 +45,7 @@ async fn test_cooldb_by_crate_name_bench_profile() {
 }
 
 async fn cooldb(profile: Option<&'static str>) -> BinProcess {
-    let mut cooldb = BinProcess::start_crate_name(
+    let mut cooldb = BinProcess::start_binary_name(
         "cooldb",
         "cooldb",
         &["--log-format", "json", "--mode", "standard"],
