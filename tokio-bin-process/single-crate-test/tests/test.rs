@@ -3,8 +3,8 @@ use tokio_bin_process::bin_path;
 use tokio_bin_process::BinProcess;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cooldb_crate_name() {
-    let process = BinProcess::start_crate_name(
+async fn test_cooldb_binary_name() {
+    let process = BinProcess::start_binary_name(
         "single-crate-test",
         "cooldb",
         &["--log-format", "json"],
