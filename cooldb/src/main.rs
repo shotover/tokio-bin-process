@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::time::Duration;
 use tokio::{
     signal::unix::{signal, SignalKind},
     sync::watch,
@@ -18,6 +19,7 @@ pub enum Mode {
     Standard,
     ErrorAtRuntime,
     ErrorAtStartup,
+    StdErrSpam,
 }
 
 #[derive(Parser, Clone)]
@@ -87,9 +89,21 @@ async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>, mode: Mode) {
 
     tracing::info!("accepting inbound connections");
 
+    let start = std::time::Instant::now();
     match mode {
         Mode::Standard | Mode::ErrorAtStartup => tracing::info!("some functionality occurs"),
         Mode::ErrorAtRuntime => tracing::error!("some error occurs"),
+        Mode::StdErrSpam => {
+            tracing::info!("some functionality occurs");
+            loop {
+                eprintln!("some library is spitting out nonsense you dont care about");
+                tokio::task::yield_now().await;
+                if start.elapsed() > Duration::from_secs(5) {
+                    break;
+                }
+            }
+            tracing::info!("other functionality occurs");
+        }
     }
 
     trigger_shutdown_rx.changed().await.unwrap();

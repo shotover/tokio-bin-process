@@ -270,9 +270,10 @@ impl BinProcess {
         .unwrap();
 
         let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
-        let reader = BufReader::new(child.stdout.take().unwrap()).lines();
+        let stdout_reader = BufReader::new(child.stdout.take().unwrap()).lines();
+        let mut stderr_reader = BufReader::new(child.stderr.take().unwrap()).lines();
         tokio::spawn(async move {
-            if let Err(err) = process_stdout_events(reader, &event_tx, log_name).await {
+            if let Err(err) = process_stdout_events(stdout_reader, &event_tx, log_name).await {
                 // Because we are in a task, panicking is likely to be ignored.
                 // Instead we generate a fake error event, which is possibly a bit confusing for the user but will at least cause the test to fail.
                 event_tx
@@ -288,6 +289,11 @@ impl BinProcess {
                         spans: Default::default(),
                     })
                     .ok();
+            }
+        });
+        tokio::spawn(async move {
+            while let Some(line) = stderr_reader.next_line().await.expect("An IO error occured while reading stderr from the application, I'm not actually sure when this happens?") {
+                tracing::error!("stderr from process: {line}");
             }
         });
 
