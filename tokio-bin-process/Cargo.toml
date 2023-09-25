@@ -1,6 +1,6 @@
 [package]
 name = "tokio-bin-process"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "run your application under a separate process with tokio tracing assertions when integration testing"
