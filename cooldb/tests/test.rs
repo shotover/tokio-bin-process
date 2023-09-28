@@ -12,16 +12,21 @@ async fn test_cooldb() {
 
     // Assert that some functionality occured.
     // Use a timeout to prevent the test hanging if no events occur.
-    timeout(Duration::from_secs(5), cooldb.consume_events(1, &[]))
-        .await
-        .unwrap()
-        .assert_contains(
-            &EventMatcher::new()
-                .with_level(Level::Info)
-                .with_message("some functionality occurs"),
-        );
+    timeout(
+        Duration::from_secs(5),
+        cooldb.consume_events(1, Some(&[]), Some(&[])),
+    )
+    .await
+    .unwrap()
+    .assert_contains(
+        &EventMatcher::new()
+            .with_level(Level::Info)
+            .with_message("some functionality occurs"),
+    );
 
-    cooldb.shutdown_and_then_consume_events(&[]).await;
+    cooldb
+        .shutdown_and_then_consume_events(Some(&[]), Some(&[]))
+        .await;
 }
 
 // Generally tokio-bin-process only cares about the contents of stdout.
@@ -34,27 +39,33 @@ async fn test_cooldb_stderr_spam() {
 
     // Assert that some functionality occured.
     // Use a timeout to prevent the test hanging if no events occur.
-    timeout(Duration::from_secs(5), cooldb.consume_events(1, &[]))
-        .await
-        .unwrap()
-        .assert_contains(
-            &EventMatcher::new()
-                .with_level(Level::Info)
-                .with_message("some functionality occurs"),
-        );
-
-    timeout(Duration::from_secs(10), cooldb.consume_events(1, &[]))
-        .await
-        .unwrap()
-        .assert_contains(
-            &EventMatcher::new()
-                .with_level(Level::Info)
-                .with_message("other functionality occurs"),
-        );
+    timeout(
+        Duration::from_secs(5),
+        cooldb.consume_events(1, Some(&[]), Some(&[])),
+    )
+    .await
+    .unwrap()
+    .assert_contains(
+        &EventMatcher::new()
+            .with_level(Level::Info)
+            .with_message("some functionality occurs"),
+    );
 
     timeout(
         Duration::from_secs(10),
-        cooldb.shutdown_and_then_consume_events(&[]),
+        cooldb.consume_events(1, Some(&[]), Some(&[])),
+    )
+    .await
+    .unwrap()
+    .assert_contains(
+        &EventMatcher::new()
+            .with_level(Level::Info)
+            .with_message("other functionality occurs"),
+    );
+
+    timeout(
+        Duration::from_secs(10),
+        cooldb.shutdown_and_then_consume_events(Some(&[]), Some(&[])),
     )
     .await
     .unwrap();
@@ -65,7 +76,9 @@ async fn test_cooldb_stderr_spam() {
 Any ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call."#)]
 async fn test_cooldb_error_at_runtime() {
     let cooldb = cooldb("error-at-runtime").await;
-    cooldb.shutdown_and_then_consume_events(&[]).await;
+    cooldb
+        .shutdown_and_then_consume_events(Some(&[]), Some(&[]))
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -73,7 +86,9 @@ async fn test_cooldb_error_at_runtime() {
 Any ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call."#)]
 async fn test_cooldb_error_at_startup() {
     let cooldb = cooldb("error-at-startup").await;
-    cooldb.shutdown_and_then_consume_events(&[]).await;
+    cooldb
+        .shutdown_and_then_consume_events(Some(&[]), Some(&[]))
+        .await;
 }
 
 async fn cooldb(mode: &str) -> BinProcess {
@@ -91,7 +106,8 @@ async fn cooldb(mode: &str) -> BinProcess {
                 .with_level(Level::Info)
                 .with_target("cooldb")
                 .with_message("accepting inbound connections"),
-            &[],
+            Some(&[]),
+            Some(&[]),
         ),
     )
     .await

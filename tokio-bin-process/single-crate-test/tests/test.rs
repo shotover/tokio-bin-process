@@ -15,7 +15,9 @@ async fn test_cooldb_binary_name() {
     // give the process time to setup its sigint/sigterm handler
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    process.shutdown_and_then_consume_events(&[]).await;
+    process
+        .shutdown_and_then_consume_events(Some(&[]), Some(&[]))
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -30,5 +32,7 @@ async fn test_cooldb_binary() {
     // give the process time to setup its sigint/sigterm handler
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    process.shutdown_and_then_consume_events(&[]).await;
+    process
+        .shutdown_and_then_consume_events(Some(&[]), Some(&[]))
+        .await;
 }

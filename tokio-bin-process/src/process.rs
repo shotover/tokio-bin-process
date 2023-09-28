@@ -320,14 +320,19 @@ impl BinProcess {
     pub async fn wait_for(
         &mut self,
         ready: &EventMatcher,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> Events {
         let mut events = vec![];
         while let Some(event) = self.event_rx.recv().await {
             let ready_match = ready.matches(&event);
             events.push(event);
             if ready_match {
-                BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
+                BinProcess::assert_no_errors_or_warnings(
+                    &events,
+                    expected_errors,
+                    expected_warnings,
+                );
                 return Events { events };
             }
         }
@@ -339,7 +344,8 @@ impl BinProcess {
     pub async fn consume_events(
         &mut self,
         event_count: usize,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> Events {
         let mut events = vec![];
         for _ in 0..event_count {
@@ -355,7 +361,7 @@ impl BinProcess {
                 }
             }
         }
-        BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
+        BinProcess::assert_no_errors_or_warnings(&events, expected_errors, expected_warnings);
         Events { events }
     }
 
@@ -363,10 +369,11 @@ impl BinProcess {
     /// All remaining events will be returned.
     pub async fn shutdown_and_then_consume_events(
         self,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> Events {
         self.signal(nix::sys::signal::Signal::SIGTERM);
-        self.consume_remaining_events(expected_errors_and_warnings)
+        self.consume_remaining_events(expected_errors, expected_warnings)
             .await
     }
 
@@ -375,10 +382,11 @@ impl BinProcess {
     /// It is useful when you need to test a shutdown method other than SIGTERM.
     pub async fn consume_remaining_events(
         mut self,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> Events {
         let (events, status) = self
-            .consume_remaining_events_inner(expected_errors_and_warnings)
+            .consume_remaining_events_inner(expected_errors, expected_warnings)
             .await;
 
         if status != 0 {
@@ -392,10 +400,11 @@ impl BinProcess {
     /// Identical to `consume_remaining_events` but asserts that the process exited with failure code instead of success
     pub async fn consume_remaining_events_expect_failure(
         mut self,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> Events {
         let (events, status) = self
-            .consume_remaining_events_inner(expected_errors_and_warnings)
+            .consume_remaining_events_inner(expected_errors, expected_warnings)
             .await;
 
         if status == 0 {
@@ -408,34 +417,34 @@ impl BinProcess {
 
     fn assert_no_errors_or_warnings(
         events: &[Event],
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) {
-        let mut error_count = vec![0; expected_errors_and_warnings.len()];
-        for event in events {
-            if let Level::Error | Level::Warn = event.level {
-                let mut matched = false;
-                for (matcher, count) in expected_errors_and_warnings
-                    .iter()
-                    .zip(error_count.iter_mut())
-                {
-                    if matcher.matches(event) {
-                        *count += 1;
-                        matched = true;
+        for expected_events in [expected_errors, expected_warnings].iter().flatten() {
+            let mut expected_count = vec![0; expected_events.len()];
+            for event in events {
+                if let Level::Error | Level::Warn = event.level {
+                    let mut matched = false;
+                    for (matcher, count) in expected_events.iter().zip(expected_count.iter_mut()) {
+                        if matcher.matches(event) {
+                            *count += 1;
+                            matched = true;
+                        }
+                    }
+                    if !matched {
+                        panic!("Unexpected event {event}\nAny ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call.")
                     }
                 }
-                if !matched {
-                    panic!("Unexpected event {event}\nAny ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call.")
-                }
             }
-        }
 
-        // TODO: move into Events::contains
-        for (matcher, count) in expected_errors_and_warnings.iter().zip(error_count.iter()) {
-            match matcher.count {
-                Count::Any => {}
-                Count::Times(matcher_count) => {
-                    if matcher_count != *count {
-                        panic!("Expected to find matches for {matcher:?}, {matcher_count} times but actually matched {count} times")
+            // TODO: move into Events::contains
+            for (matcher, count) in expected_events.iter().zip(expected_count.iter()) {
+                match matcher.count {
+                    Count::Any => {}
+                    Count::Times(matcher_count) => {
+                        if matcher_count != *count {
+                            panic!("Expected to find matches for {matcher:?}, {matcher_count} times but actually matched {count} times")
+                        }
                     }
                 }
             }
@@ -444,7 +453,8 @@ impl BinProcess {
 
     async fn consume_remaining_events_inner(
         &mut self,
-        expected_errors_and_warnings: &[EventMatcher],
+        expected_errors: Option<&[EventMatcher]>,
+        expected_warnings: Option<&[EventMatcher]>,
     ) -> (Events, i32) {
         // Take the child before we wait for the process to terminate.
         // This ensures that the drop bomb wont go off if the future is dropped partway through.
@@ -456,7 +466,7 @@ impl BinProcess {
             events.push(event);
         }
 
-        BinProcess::assert_no_errors_or_warnings(&events, expected_errors_and_warnings);
+        BinProcess::assert_no_errors_or_warnings(&events, expected_errors, expected_warnings);
 
         use std::os::unix::process::ExitStatusExt;
         let output = child.wait_with_output().await.unwrap();

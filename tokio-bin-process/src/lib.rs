@@ -47,7 +47,8 @@
 //!                 .with_level(Level::Info)
 //!                 .with_target("cooldb")
 //!                 .with_message("accepting inbound connections"),
-//!             &[]
+//!             Some(&[]),
+//!             Some(&[]),
 //!         ),
 //!     )
 //!     .await
@@ -67,12 +68,13 @@
 //!     // but allow and expect a certain warning.
 //!     // A drop bomb ensures that the test will fail if we forget to call this method.
 //!     cooldb
-//!         .shutdown_and_then_consume_events(&[
+//!         .shutdown_and_then_consume_events(Some(&[
 //!             EventMatcher::new()
 //!                 .with_level(Level::Warn)
 //!                 .with_target("cooldb::internal")
 //!                 .with_message("The user did something silly that we want to warn about but is actually expected in this test case")
-//!         ])
+//!         ]),
+//!         Some(&[]))
 //!         .await;
 //! }
 //! ```
