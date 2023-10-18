@@ -100,6 +100,12 @@ pub enum Count {
     Any,
 }
 
+impl From<usize> for Count {
+    fn from(item: usize) -> Self {
+        Self::Times(item)
+    }
+}
+
 impl Default for Count {
     fn default() -> Self {
         Count::Times(1)
