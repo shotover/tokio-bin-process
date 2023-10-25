@@ -74,7 +74,7 @@ async fn test_some_functionality() {
 ```
 
 When Cargo builds integration tests or benchmarks it provides a path to the binary under test.
-We can make use of that for speed and robustness as exampled here `cooldb/tests/test.rs`.
+We can make use of that for speed and robustness.
 
 But that is not always flexible enough so as a fallback `BinProcess` can invoke cargo again internally to ensure the binary we need is compiled as exampled here: `tokio-bin-process/tests/test.rs`
 For more details on different use cases refer to: <https://docs.rs/tokio-bin-process/latest/tokio_bin_process/struct.BinProcess.html>
@@ -88,4 +88,4 @@ You will need to:
 * Handle panics as a `tracing::error!` in JSON mode.
 * Ensure SIGTERM cleanly shutsdown the application and exits with a return code.
 
-The `cooldb` example crate is a complete demonstration of all these requirements.
+The [cooldb](https://github.com/shotover/tokio-bin-process/blob/main/cooldb/src/main.rs) example crate is a complete demonstration of all these requirements.

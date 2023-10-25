@@ -45,13 +45,8 @@ async fn test_cooldb_by_binary_name_bench_profile() {
 }
 
 async fn cooldb(profile: Option<&'static str>) -> BinProcess {
-    let mut cooldb = BinProcess::start_binary_name(
-        "cooldb",
-        "cooldb",
-        &["--log-format", "json", "--mode", "standard"],
-        profile,
-    )
-    .await;
+    let mut cooldb =
+        BinProcess::start_binary_name("cooldb", "cooldb", &["--log-format", "json"], profile).await;
 
     timeout(
         Duration::from_secs(30),
