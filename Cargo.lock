@@ -349,6 +349,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-test"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "backtrace-ext",
+ "clap",
+ "tokio",
+ "tokio-bin-process",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

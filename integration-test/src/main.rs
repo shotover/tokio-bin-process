@@ -1,6 +1,9 @@
 use clap::Parser;
-use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::watch;
+use std::time::Duration;
+use tokio::{
+    signal::unix::{signal, SignalKind},
+    sync::watch,
+};
 use tracing_appender::non_blocking::WorkerGuard;
 
 mod tracing_panic_handler;
@@ -11,11 +14,21 @@ pub enum LogFormat {
     Json,
 }
 
+#[derive(clap::ValueEnum, Clone, Copy)]
+pub enum Mode {
+    Standard,
+    ErrorAtRuntime,
+    ErrorAtStartup,
+    StdErrSpam,
+}
+
 #[derive(Parser, Clone)]
 #[clap()]
 pub struct ConfigOpts {
     #[arg(long, value_enum, default_value = "human")]
     pub log_format: LogFormat,
+    #[arg(long, value_enum)]
+    pub mode: Mode,
 }
 
 #[tokio::main]
@@ -43,7 +56,7 @@ async fn main() {
         trigger_shutdown_tx.send(true).unwrap();
     });
 
-    db_logic(trigger_shutdown_rx).await;
+    db_logic(trigger_shutdown_rx, opts.mode).await;
 }
 
 pub fn init_tracing(format: LogFormat) -> WorkerGuard {
@@ -69,10 +82,29 @@ pub fn init_tracing(format: LogFormat) -> WorkerGuard {
     guard
 }
 
-async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>) {
+async fn db_logic(mut trigger_shutdown_rx: watch::Receiver<bool>, mode: Mode) {
+    if let Mode::ErrorAtStartup = mode {
+        tracing::error!("An error occurs during startup");
+    }
+
     tracing::info!("accepting inbound connections");
 
-    tracing::info!("some functionality occurs");
+    let start = std::time::Instant::now();
+    match mode {
+        Mode::Standard | Mode::ErrorAtStartup => tracing::info!("some functionality occurs"),
+        Mode::ErrorAtRuntime => tracing::error!("some error occurs"),
+        Mode::StdErrSpam => {
+            tracing::info!("some functionality occurs");
+            loop {
+                eprintln!("some library is spitting out nonsense you dont care about");
+                tokio::task::yield_now().await;
+                if start.elapsed() > Duration::from_secs(5) {
+                    break;
+                }
+            }
+            tracing::info!("other functionality occurs");
+        }
+    }
 
     trigger_shutdown_rx.changed().await.unwrap();
 }
