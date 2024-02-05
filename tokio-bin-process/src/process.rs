@@ -244,17 +244,14 @@ impl BinProcess {
             format!("{log_name: <10}") // pads log_name up to 10 chars so that it lines up properly when included in log output.
         };
 
-        let mut child = Some(
-            Command::new(bin_path)
-                .args(binary_args)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn()
-                .context(format!("Failed to run {bin_path:?}"))
-                .unwrap(),
-        )
-        .unwrap();
+        let mut child = Command::new(bin_path)
+            .args(binary_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .context(format!("Failed to run {bin_path:?}"))
+            .unwrap();
 
         let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
         let stdout_reader = BufReader::new(child.stdout.take().unwrap()).lines();
@@ -369,8 +366,7 @@ impl BinProcess {
             .await;
 
         if status != 0 {
-            let events: String = events.events.iter().map(|x| format!("\n{x}")).collect();
-            panic!("The bin process exited with {status} but expected 0 exit code (Success).\nevents:{events}");
+            panic!("The bin process exited with {status} but expected 0 exit code (Success).\nevents:\n{events}");
         }
 
         events
@@ -386,8 +382,7 @@ impl BinProcess {
             .await;
 
         if status == 0 {
-            let events: String = events.events.iter().map(|x| format!("\n{x}")).collect();
-            panic!("The bin process exited with {status} but expected non 0 exit code (Failure).\nevents:{events}");
+            panic!("The bin process exited with {status} but expected non 0 exit code (Failure).\nevents:\n{events}");
         }
 
         events
