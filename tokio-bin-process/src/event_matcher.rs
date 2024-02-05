@@ -1,5 +1,7 @@
 //! Structures for matching an [`Event`]
 
+use std::fmt::Display;
+
 use crate::event::{Event, Level};
 use itertools::Itertools;
 
@@ -22,6 +24,22 @@ impl Events {
     #[allow(dead_code)]
     fn assert_contains_in_order(&self, _matchers: &[EventMatcher]) {
         todo!()
+    }
+}
+
+impl Display for Events {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut first = true;
+        for event in &self.events {
+            if first {
+                write!(f, "{event}")?;
+            } else {
+                write!(f, "\n{event}")?;
+            }
+            first = false;
+        }
+
+        Ok(())
     }
 }
 
