@@ -4,3 +4,4 @@ members = [
     "cooldb",
     "integration-test"
 ]
+resolver = "2"
