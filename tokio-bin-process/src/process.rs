@@ -18,7 +18,6 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, ChildStdout, Command},
 };
-use tracing_subscriber::fmt::TestWriter;
 
 struct CargoCache {
     metadata: Option<Metadata>,
@@ -147,14 +146,6 @@ impl Drop for BinProcess {
     }
 }
 
-fn setup_tracing_subscriber_for_test_logic() {
-    tracing_subscriber::fmt()
-        .with_writer(TestWriter::new())
-        .with_env_filter("warn")
-        .try_init()
-        .ok();
-}
-
 impl BinProcess {
     /// Prefer [`BinProcess::start_binary`] where possible as it is faster and more robust.
     ///
@@ -178,8 +169,6 @@ impl BinProcess {
         binary_args: &[&str],
         cargo_profile: Option<&str>,
     ) -> BinProcess {
-        setup_tracing_subscriber_for_test_logic();
-
         // PROFILE is set in build.rs from PROFILE listed in https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
         let profile = cargo_profile.unwrap_or(if env!("PROFILE") == "release" {
             "release"
@@ -249,8 +238,6 @@ impl BinProcess {
     /// The `binary_args` will be used as the args to the binary.
     /// The args should give the desired setup for the given integration test and should also enable the `tracing` JSON logger to stdout if that is not the default.
     pub async fn start_binary(bin_path: &Path, log_name: &str, binary_args: &[&str]) -> BinProcess {
-        setup_tracing_subscriber_for_test_logic();
-
         let log_name = if log_name.len() > 10 {
             panic!("In order to line up in log outputs, argument log_name to BinProcess::start_with_args must be of length <= 10 but the value was: {log_name}");
         } else {
