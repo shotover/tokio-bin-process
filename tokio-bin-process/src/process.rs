@@ -287,16 +287,28 @@ impl BinProcess {
         }
     }
 
-    pub fn child(&self) -> &Child {
-        self.child.as_ref().unwrap()
+    /// Return the PID of
+    /// TODO: when nix crate is 1.0 this method should return a `nix::unistd::Pid` instead of an i32
+    pub fn pid(&self) -> i32 {
+        self.child.as_ref().unwrap().id().unwrap() as i32
     }
 
-    fn pid(&self) -> Pid {
-        Pid::from_raw(self.child.as_ref().unwrap().id().unwrap() as i32)
+    /// TODO: make this public when nix crate goes 1.0
+    ///       Additionally reexport the Signal enum so that the user doesnt need to manually add nix crate to their Cargo.toml
+    fn send_signal(&self, signal: Signal) {
+        nix::sys::signal::kill(Pid::from_raw(self.pid()), signal).unwrap();
     }
 
-    pub fn signal(&self, signal: Signal) {
-        nix::sys::signal::kill(self.pid(), signal).unwrap();
+    /// Send SIGTERM to the process
+    /// TODO: This will be replaced with a `send_signal` method when nix crate is 1.0
+    pub fn send_sigterm(&self) {
+        self.send_signal(Signal::SIGTERM)
+    }
+
+    /// Send SIGINT to the process
+    /// TODO: This will be replaced with a `send_signal` method when nix crate is 1.0
+    pub fn send_sigint(&self) {
+        self.send_signal(Signal::SIGINT)
     }
 
     /// Waits for the `ready` `EventMatcher` to match on an incoming event.
@@ -349,7 +361,7 @@ impl BinProcess {
         self,
         expected_errors_and_warnings: &[EventMatcher],
     ) -> Events {
-        self.signal(nix::sys::signal::Signal::SIGTERM);
+        self.send_signal(nix::sys::signal::Signal::SIGTERM);
         self.consume_remaining_events(expected_errors_and_warnings)
             .await
     }
