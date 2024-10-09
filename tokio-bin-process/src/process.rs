@@ -432,6 +432,16 @@ impl BinProcess {
                         panic!("Expected to find matches for {matcher:?}, {matcher_count} times but actually matched {count} times")
                     }
                 }
+                Count::GreaterThanOrEqual(x) => {
+                    if *count < x {
+                        panic!("Expected to find matches for {matcher:?}, greater than or equal to {x} times but actually matched {count} times")
+                    }
+                }
+                Count::LessThanOrEqual(x) => {
+                    if *count > x {
+                        panic!("Expected to find matches for {matcher:?}, less than or equal to {x} times but actually matched {count} times")
+                    }
+                }
             }
         }
     }
