@@ -110,12 +110,17 @@ impl EventMatcher {
 
 /// Defines how many times the [`EventMatcher`] must match to pass an assertion.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Count {
     /// This matcher must match this many times to pass an assertion.
     Times(usize),
     /// This matcher may match 0 or more times and will still pass an assertion.
     /// Use sparingly but useful for ignoring a warning or error that is not appearing deterministically.
     Any,
+    /// This matcher must match this many times or more to pass an asssertion
+    GreaterThanOrEqual(usize),
+    /// This matcher must match this many times or fewer to pass an asssertion
+    LessThanOrEqual(usize),
 }
 
 impl From<usize> for Count {
