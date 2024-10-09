@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use crate::event::{Event, Level};
 use itertools::Itertools;
+use regex_lite::Regex;
 
 /// Use to check for any matching [`Event`]'s among a list of events.
 #[derive(Debug)]
@@ -63,6 +64,7 @@ impl Display for Events {
 pub struct EventMatcher {
     level: Matcher<Level>,
     message: Matcher<String>,
+    message_regex: RegexMatcher,
     target: Matcher<String>,
     pub(crate) count: Count,
 }
@@ -91,6 +93,12 @@ impl EventMatcher {
         self
     }
 
+    /// Sets the matcher to only match an [`Event`] when it matches the provided regex pattern
+    pub fn with_message_regex(mut self, regex_pattern: &str) -> EventMatcher {
+        self.message_regex = RegexMatcher::new(regex_pattern);
+        self
+    }
+
     /// Defines how many times the matcher must match to pass an assertion
     ///
     /// This is not used internally i.e. it has no effect on [`EventMatcher::matches`]
@@ -104,6 +112,7 @@ impl EventMatcher {
     pub fn matches(&self, event: &Event) -> bool {
         self.level.matches(&event.level)
             && self.message.matches(&event.fields.message)
+            && self.message_regex.matches(&event.fields.message)
             && self.target.matches(&event.target)
     }
 }
@@ -142,6 +151,28 @@ impl<T: PartialEq> Matcher<T> {
         match self {
             Matcher::Matches(x) => value == x,
             Matcher::Any => true,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+enum RegexMatcher {
+    Matches(Regex),
+    #[default]
+    Any,
+}
+
+impl RegexMatcher {
+    fn new(pattern: &str) -> Self {
+        RegexMatcher::Matches(regex_lite::Regex::new(pattern).unwrap())
+    }
+}
+
+impl RegexMatcher {
+    fn matches(&self, value: &str) -> bool {
+        match self {
+            RegexMatcher::Matches(regex) => regex.is_match(value),
+            RegexMatcher::Any => true,
         }
     }
 }

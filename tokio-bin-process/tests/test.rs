@@ -44,6 +44,47 @@ async fn test_cooldb_by_binary_name_bench_profile() {
     cooldb.shutdown_and_then_consume_events(&[]).await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_message_regex_match() {
+    // Setup cooldb with custom profile
+    let mut cooldb = cooldb(Some("bench")).await;
+
+    // Assert that some functionality occured.
+    // Use a timeout to prevent the test hanging if no events occur.
+    timeout(Duration::from_secs(5), cooldb.consume_events(1, &[]))
+        .await
+        .unwrap()
+        .assert_contains(
+            &EventMatcher::new()
+                .with_level(Level::Info)
+                .with_message_regex("some .* occurs"),
+        );
+
+    // Shutdown cooldb asserting that it encountered no errors
+    cooldb.shutdown_and_then_consume_events(&[]).await;
+}
+
+#[should_panic]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_message_regex_no_match() {
+    // Setup cooldb with custom profile
+    let mut cooldb = cooldb(Some("bench")).await;
+
+    // Assert that some functionality occured.
+    // Use a timeout to prevent the test hanging if no events occur.
+    timeout(Duration::from_secs(5), cooldb.consume_events(1, &[]))
+        .await
+        .unwrap()
+        .assert_contains(
+            &EventMatcher::new()
+                .with_level(Level::Info)
+                .with_message_regex("some .* does not occur"),
+        );
+
+    // Shutdown cooldb asserting that it encountered no errors
+    cooldb.shutdown_and_then_consume_events(&[]).await;
+}
+
 async fn cooldb(profile: Option<&'static str>) -> BinProcess {
     let mut cooldb =
         BinProcess::start_binary_name("cooldb", "cooldb", &["--log-format", "json"], profile).await;
