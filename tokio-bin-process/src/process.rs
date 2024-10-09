@@ -6,12 +6,11 @@ use itertools::Itertools;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use nu_ansi_term::Color;
-use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use subprocess::{Exec, Redirection};
 use tokio::sync::mpsc;
 use tokio::{
@@ -37,7 +36,7 @@ struct BuiltBinary {
 // Unfortunately this doesnt work when running each test in its own process. e.g. when using nextest
 // But worst case it just unnecessarily reruns `cargo build`.
 // TODO: we might be able to use CARGO_TARGET_TMPDIR to fix for nextest
-static CARGO_CACHE: Lazy<Mutex<CargoCache>> = Lazy::new(|| {
+static CARGO_CACHE: LazyLock<Mutex<CargoCache>> = LazyLock::new(|| {
     Mutex::new(CargoCache {
         metadata: None,
         built_binaries: HashSet::new(),
