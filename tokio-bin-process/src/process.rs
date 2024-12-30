@@ -8,7 +8,7 @@ use nix::unistd::Pid;
 use nu_ansi_term::Color;
 use std::collections::HashSet;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{LazyLock, Mutex};
 use subprocess::{Exec, Redirection};
@@ -17,6 +17,187 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, ChildStdout, Command},
 };
+
+enum BuilderKind {
+    Path(PathBuf),
+    CargoName {
+        name: String,
+        profile: Option<String>,
+    },
+}
+
+/// Start a running process of a binary.
+///
+/// All `tracing` events emitted by your binary in JSON over stdout will be processed by `BinProcess` and then emitted to the tests stdout in the default human readable tracing format.
+/// To ensure any WARN/ERROR's from your test logic are visible, `BinProcess` will setup its own subscriber that outputs to the tests stdout in the default human readable format.
+/// If you set your own subscriber before constructing a [`BinProcess`] that will take preference instead.
+///
+/// Dropping the BinProcess will trigger a panic unless [`BinProcess::shutdown_and_then_consume_events`] or [`BinProcess::consume_remaining_events`] has been called.
+/// This is done to avoid missing important assertions run by those methods.
+///
+/// ## Which constructor to use:
+/// A guide to constructing `BinProcess` based on your use case:
+///
+/// ### You are writing an integration test or bench and the binary you want to run is defined in the same package as the test or bench you are writing.
+///
+/// Use [`BinProcessBuilder::from_path`] like this:
+/// ```rust
+/// # use tokio_bin_process::BinProcessBuilder;
+/// # // hack to make the doc test compile
+/// # macro_rules! bin_path {
+/// #     ($bin_name:expr) => {
+/// #         std::path::PathBuf::from("foo")
+/// #     };
+/// # }
+/// # async {
+/// BinProcessBuilder::from_path(bin_path!("cooldb"))
+///     .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+///     .start()
+///     .await;
+/// # };
+/// ```
+/// Using `from_path` instead of `from_cargo_name` here is faster and more robust as `BinProcess`
+/// does not need to invoke Cargo.
+///
+/// ### You are writing an integration test or bench and the binary you want to test is in the same
+/// workspace but in a different package to the test or bench you are writing.
+/// Use [`BinProcessBuilder::from_cargo_name`] like this:
+/// ```rust
+/// # use tokio_bin_process::BinProcessBuilder;
+/// # async {
+/// BinProcessBuilder::from_cargo_name("cooldb".to_owned(), None)
+///     .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+///     .start()
+///     .await;
+/// # };
+/// ```
+///
+/// ### You are writing an example or other binary within a package
+/// Use [`BinProcessBuilder::from_cargo_name`] like this:
+/// ```rust
+/// # use tokio_bin_process::BinProcessBuilder;
+/// # async {
+/// BinProcessBuilder::from_cargo_name("cooldb".to_owned(), None)
+///     .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+///     .start()
+///     .await;
+/// # };
+/// ```
+///
+/// ### You need to compile the binary with an arbitrary profile
+/// Use [`BinProcessBuilder::from_cargo_name`] like this:
+/// ```rust
+/// # use tokio_bin_process::BinProcessBuilder;
+/// # async {
+/// BinProcessBuilder::from_cargo_name("cooldb".to_owned(), Some("profilename".to_owned()))
+///     .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+///     .start()
+///     .await;
+/// # };
+/// ```
+///
+/// ### You have an arbitrary pre-compiled binary to run
+/// Use [`BinProcessBuilder::from_path`] like this:
+/// ```rust
+/// # use tokio_bin_process::BinProcessBuilder;
+/// # use std::path::PathBuf;
+/// # async {
+/// BinProcessBuilder::from_path(PathBuf::from("some/path/to/precompiled/cooldb"))
+///     .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+///     .start()
+///     .await;
+/// # };
+/// ```
+pub struct BinProcessBuilder {
+    kind: BuilderKind,
+    log_name: Option<String>,
+    binary_args: Vec<String>,
+    env_vars: Vec<(String, String)>,
+}
+
+impl BinProcessBuilder {
+    /// Start the binary specified in `bin_path`.
+    ///
+    /// Make sure to also call `with_args` or `with_env_vars` to enable the `tracing` JSON logger to stdout if that is not the default.
+    pub fn from_path(bin_path: PathBuf) -> Self {
+        BinProcessBuilder {
+            kind: BuilderKind::Path(bin_path),
+            log_name: None,
+            binary_args: vec![],
+            env_vars: vec![],
+        }
+    }
+
+    /// Prefer [`BinProcessBuilder::from_path`] where possible as it is faster and more robust.
+    ///
+    /// Start the binary named `cargo_bin_name` in the current workspace in a new process.
+    /// A `BinProcess` is returned which can be used to interact with the process.
+    ///
+    /// The crate will be compiled with the Cargo profile specified in `cargo_profile`.
+    /// * When it is `Some(_)` the value specified is used.
+    /// * When it is `None` it will use "release" if `tokio-bin-process` was compiled in a release derived profile or "dev" if it was compiled in a dev derived profile.
+    ///
+    /// The reason `None` will only ever result in a "release" or "dev" profile is due to a limitation on what profile information Cargo exposes to us.
+    ///
+    /// Make sure to also call `with_args` or `with_env_vars` to enable the `tracing` JSON logger to stdout if that is not the default.
+    pub fn from_cargo_name(name: String, profile: Option<String>) -> Self {
+        BinProcessBuilder {
+            kind: BuilderKind::CargoName { name, profile },
+            log_name: None,
+            binary_args: vec![],
+            env_vars: vec![],
+        }
+    }
+
+    /// `log_name` is prepended to the logs that `BinProcess` forwards to stdout.
+    /// This helps to differentiate between `tracing` logs generated by the test itself and the process under test.
+    /// The log name must be <= 10 characters.
+    pub fn with_log_name(mut self, log_name: Option<String>) -> Self {
+        self.log_name = log_name;
+        self
+    }
+
+    /// The `args` will be used as the args to the binary.
+    /// The args should give the desired setup for the given integration test.
+    pub fn with_args(mut self, args: Vec<String>) -> Self {
+        self.binary_args = args;
+        self
+    }
+
+    /// The `env_vars` will be used as the env vars given to the binary.
+    /// The env vars should give the desired setup for the given integration test.
+    pub fn with_env_vars(mut self, env_vars: Vec<(String, String)>) -> Self {
+        self.env_vars = env_vars;
+        self
+    }
+
+    /// Start the binary specified by from_path or from_cargo_name
+    pub async fn start(self) -> BinProcess {
+        match self.kind {
+            BuilderKind::Path(path) => {
+                let binary_name = path.file_name().expect("Path needs at least one element");
+                let log_name = self
+                    .log_name
+                    .as_deref()
+                    .unwrap_or(binary_name.to_str().unwrap());
+
+                BinProcess::start_binary(&path, log_name, &self.env_vars, &self.binary_args).await
+            }
+            BuilderKind::CargoName { name, profile } => {
+                let log_name = self.log_name.as_deref().unwrap_or(&name);
+
+                BinProcess::start_binary_name(
+                    &name,
+                    log_name,
+                    &self.env_vars,
+                    &self.binary_args,
+                    profile.as_deref(),
+                )
+                .await
+            }
+        }
+    }
+}
 
 struct CargoCache {
     metadata: Option<Metadata>,
@@ -43,94 +224,6 @@ static CARGO_CACHE: LazyLock<Mutex<CargoCache>> = LazyLock::new(|| {
     })
 });
 
-/// A running process of a binary.
-///
-/// All `tracing` events emitted by your binary in JSON over stdout will be processed by `BinProcess` and then emitted to the tests stdout in the default human readable tracing format.
-/// To ensure any WARN/ERROR's from your test logic are visible, `BinProcess` will setup its own subscriber that outputs to the tests stdout in the default human readable format.
-/// If you set your own subscriber before constructing a [`BinProcess`] that will take preference instead.
-///
-/// Dropping the BinProcess will trigger a panic unless [`BinProcess::shutdown_and_then_consume_events`] or [`BinProcess::consume_remaining_events`] has been called.
-/// This is done to avoid missing important assertions run by those methods.
-///
-/// ## Which constructor to use:
-/// A guide to constructing `BinProcess` based on your use case:
-///
-/// ### You are writing an integration test or bench and the binary you want to run is defined in the same package as the test or bench you are writing.
-///
-/// Use [`BinProcess::start_binary`] like this:
-/// ```rust
-/// # use tokio_bin_process::BinProcess;
-/// # // hack to make the doc test compile
-/// # macro_rules! bin_path {
-/// #     ($bin_name:expr) => {
-/// #         &std::path::Path::new("foo")
-/// #     };
-/// # }
-/// # async {
-/// BinProcess::start_binary(
-///     bin_path!("cooldb"),
-///     "cooldb",
-///     &["--log-format", "json"],
-/// ).await;
-/// # };
-/// ```
-/// Using `start_binary` instead of `start_binary_name` here is faster and more robust as `BinProcess` does not need to invoke Cargo.
-///
-/// ### You are writing an integration test or bench and the binary you want to test is in the same workspace but in a different package to the test or bench you are writing.
-/// Use [`BinProcess::start_binary_name`] like this:
-/// ```rust
-/// # use tokio_bin_process::BinProcess;
-/// # async {
-/// BinProcess::start_binary_name(
-///     "cooldb",
-///     "cooldb",
-///     &["--log-format", "json"],
-///     None
-/// ).await;
-/// # };
-/// ```
-///
-/// ### You are writing an example or other binary within a package
-/// Use [`BinProcess::start_binary_name`] like this:
-/// ```rust
-/// # use tokio_bin_process::BinProcess;
-/// # async {
-/// BinProcess::start_binary_name(
-///     "cooldb",
-///     "cooldb",
-///     &["--log-format", "json"],
-///     None
-/// ).await;
-/// # };
-/// ```
-///
-/// ### You need to compile the binary with an arbitrary profile
-/// Use [`BinProcess::start_binary_name`] like this:
-/// ```rust
-/// # use tokio_bin_process::BinProcess;
-/// # async {
-/// BinProcess::start_binary_name(
-///     "cooldb",
-///     "cooldb",
-///     &["--log-format", "json"],
-///     Some("profilename")
-/// ).await;
-/// # };
-/// ```
-///
-/// ### You have an arbitrary pre-compiled binary to run
-/// Use [`BinProcess::start_binary`] like this:
-/// ```rust
-/// # use tokio_bin_process::BinProcess;
-/// # use std::path::Path;
-/// # async {
-/// BinProcess::start_binary(
-///     Path::new("some/path/to/precompiled/cooldb"),
-///     "cooldb",
-///     &["--log-format", "json"],
-/// ).await;
-/// # };
-/// ```
 pub struct BinProcess {
     /// Always Some while BinProcess is owned
     child: Option<Child>,
@@ -146,26 +239,11 @@ impl Drop for BinProcess {
 }
 
 impl BinProcess {
-    /// Prefer [`BinProcess::start_binary`] where possible as it is faster and more robust.
-    ///
-    /// Start the binary named `cargo_bin_name` in the current workspace in a new process.
-    /// A `BinProcess` is returned which can be used to interact with the process.
-    ///
-    /// `log_name` is prepended to the logs that `BinProcess` forwards to stdout.
-    /// This helps to differentiate between `tracing` logs generated by the test itself and the process under test.
-    ///
-    /// The `binary_args` will be used as the args to the binary.
-    /// The args should give the desired setup for the given integration test and should also enable the `tracing` JSON logger to stdout if that is not the default.
-    ///
-    /// The crate will be compiled with the Cargo profile specified in `cargo_profile`.
-    /// * When it is `Some(_)` the value specified is used.
-    /// * When it is `None` it will use "release" if `tokio-bin-process` was compiled in a release derived profile or "dev" if it was compiled in a dev derived profile.
-    ///
-    /// The reason `None` will only ever result in a "release" or "dev" profile is due to a limitation on what profile information Cargo exposes to us.
-    pub async fn start_binary_name(
+    async fn start_binary_name(
         cargo_bin_name: &str,
         log_name: &str,
-        binary_args: &[&str],
+        env_vars: &[(String, String)],
+        binary_args: &[String],
         cargo_profile: Option<&str>,
     ) -> BinProcess {
         // PROFILE is set in build.rs from PROFILE listed in https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
@@ -224,19 +302,18 @@ impl BinProcess {
         BinProcess::start_binary(
             bin_path.into_std_path_buf().as_path(),
             log_name,
+            env_vars,
             binary_args,
         )
         .await
     }
 
-    /// Start the binary specified in `bin_path`.
-    ///
-    /// `log_name` is prepended to the logs that `BinProcess` forwards to stdout.
-    /// This helps to differentiate between `tracing` logs generated by the test itself and the process under test.
-    ///
-    /// The `binary_args` will be used as the args to the binary.
-    /// The args should give the desired setup for the given integration test and should also enable the `tracing` JSON logger to stdout if that is not the default.
-    pub async fn start_binary(bin_path: &Path, log_name: &str, binary_args: &[&str]) -> BinProcess {
+    async fn start_binary(
+        bin_path: &Path,
+        log_name: &str,
+        env_vars: &[(String, String)],
+        binary_args: &[String],
+    ) -> BinProcess {
         let log_name = if log_name.len() > 10 {
             panic!("In order to line up in log outputs, argument log_name to BinProcess::start_with_args must be of length <= 10 but the value was: {log_name}");
         } else {
@@ -245,6 +322,7 @@ impl BinProcess {
 
         let mut child = Command::new(bin_path)
             .args(binary_args)
+            .envs(env_vars.iter().map(|(k, v)| (k.as_str(), v.as_str())))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)

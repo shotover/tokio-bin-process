@@ -1,9 +1,9 @@
 use std::time::Duration;
 use tokio::time::timeout;
-use tokio_bin_process::bin_path;
 use tokio_bin_process::event::Level;
 use tokio_bin_process::event_matcher::EventMatcher;
 use tokio_bin_process::BinProcess;
+use tokio_bin_process::{bin_path, BinProcessBuilder};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb() {
@@ -25,8 +25,10 @@ async fn test_cooldb() {
 }
 
 async fn cooldb() -> BinProcess {
-    let mut cooldb =
-        BinProcess::start_binary(bin_path!("cooldb"), "cooldb", &["--log-format", "json"]).await;
+    let mut cooldb = BinProcessBuilder::from_path(bin_path!("cooldb"))
+        .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+        .start()
+        .await;
 
     timeout(
         Duration::from_secs(30),

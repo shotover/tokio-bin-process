@@ -11,33 +11,41 @@
 //!
 //! ```rust
 //! use tokio_bin_process::event::Level;
-//! use tokio_bin_process::{BinProcess, bin_path};
+//! use tokio_bin_process::{BinProcess, BinProcessBuilder, bin_path};
 //! use tokio_bin_process::event_matcher::EventMatcher;
 //! use std::time::Duration;
 //! use std::path::PathBuf;
 //! # // hack to make the doc test compile
 //! # macro_rules! bin_path {
 //! #     ($bin_name:expr) => {
-//! #         &std::path::Path::new("foo")
+//! #         std::path::PathBuf::from("foo")
 //! #     };
 //! # }
 //!
 //! /// you'll want a helper like this as you'll be creating this in every integration test.
 //! async fn cooldb_process() -> BinProcess {
 //!     // start the process
-//!     let mut process = BinProcess::start_binary(
-//!         // Locate the path to the cooldb binary from an integration test or benchmark
-//!         bin_path!("cooldb"),
-//!         "cooldb", // The name that BinProcess should prepend its forwarded logs with
-//!         &[
-//!             // provide any custom CLI args required
-//!             "--foo", "bar",
+//!     let mut process = BinProcessBuilder::from_path(
+//!             // Locate the path to the cooldb binary from an integration test or benchmark
+//!             bin_path!("cooldb")
+//!         )
+//!         .with_log_name(Some("cooldb1".to_owned())) // The name that BinProcess should prepend its forwarded logs with
+//!         .with_env_vars(vec![
+//!             // provide any custom env vars required
+//!             ("FOO".to_owned(), "BAR".to_owned()),
 //!             // tokio-bin-process relies on reading tracing json's output,
 //!             // so configure the application to produce that
-//!             "--log-format", "json"
-//!         ],
-//!     )
-//!     .await;
+//!             ("COOLDB_LOG_FORMAT".to_owned(), "JSON".to_owned())
+//!         ])
+//!         .with_args(vec![
+//!             // provide any custom CLI args required
+//!             "--foo".to_owned(), "bar".to_owned(),
+//!             // tokio-bin-process relies on reading tracing json's output,
+//!             // so configure the application to produce that
+//!             "--log-format".to_owned(), "json".to_owned()
+//!         ])
+//!         .start()
+//!         .await;
 //!
 //!     // block asynchrounously until the application gives an event indicating that its ready
 //!     tokio::time::timeout(
@@ -78,14 +86,15 @@
 //! ```
 //!
 //! When Cargo builds integration tests or benchmarks it provides a path to the binary under test.
-//! We can make use of that for speed and robustness with [`BinProcess::start_binary`].
+//! We can make use of that for speed and robustness with [`BinProcessBuilder::from_path`].
 //!
-//! But that is not always flexible enough so as a fallback [`BinProcess`] can invoke Cargo again internally to ensure the binary we need is compiled via [`BinProcess::start_binary_name`].
+//! But that is not always flexible enough so as a fallback [`BinProcess`] can invoke Cargo again internally to ensure the binary we need is compiled via [`BinProcessBuilder::from_cargo_name`].
 pub mod event;
 pub mod event_matcher;
 mod process;
 
 pub use process::BinProcess;
+pub use process::BinProcessBuilder;
 
 /// When called from within an integration test or benchmark, returns the path to the binary with the specified crate name in the current package.
 ///
@@ -99,6 +108,6 @@ pub use process::BinProcess;
 #[macro_export]
 macro_rules! bin_path {
     ($bin_name:expr) => {
-        &std::path::Path::new(std::env!(concat!("CARGO_BIN_EXE_", $bin_name)))
+        std::path::PathBuf::from(std::env!(concat!("CARGO_BIN_EXE_", $bin_name)))
     };
 }

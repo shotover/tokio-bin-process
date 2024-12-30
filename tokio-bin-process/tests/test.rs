@@ -2,7 +2,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tokio_bin_process::event::Level;
 use tokio_bin_process::event_matcher::EventMatcher;
-use tokio_bin_process::BinProcess;
+use tokio_bin_process::{BinProcess, BinProcessBuilder};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb_by_binary_name() {
@@ -85,9 +85,12 @@ async fn test_message_regex_no_match() {
     cooldb.shutdown_and_then_consume_events(&[]).await;
 }
 
-async fn cooldb(profile: Option<&'static str>) -> BinProcess {
+async fn cooldb(profile: Option<&str>) -> BinProcess {
     let mut cooldb =
-        BinProcess::start_binary_name("cooldb", "cooldb", &["--log-format", "json"], profile).await;
+        BinProcessBuilder::from_cargo_name("cooldb".to_owned(), profile.map(|x| x.to_owned()))
+            .with_args(vec!["--log-format".to_owned(), "json".to_owned()])
+            .start()
+            .await;
 
     timeout(
         Duration::from_secs(30),
