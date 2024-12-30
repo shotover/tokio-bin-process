@@ -167,7 +167,7 @@ impl Display for Event {
 
 struct QuotelessDisplay<'a>(&'a JsonValue);
 
-impl<'a> Display for QuotelessDisplay<'a> {
+impl Display for QuotelessDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             QuotelessDisplay(JsonValue::String(str)) => write!(f, "{str}"),
