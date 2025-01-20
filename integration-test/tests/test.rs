@@ -1,9 +1,9 @@
 use std::time::Duration;
 use tokio::time::timeout;
-use tokio_bin_process::bin_path;
 use tokio_bin_process::event::Level;
 use tokio_bin_process::event_matcher::EventMatcher;
 use tokio_bin_process::BinProcess;
+use tokio_bin_process::{bin_path, BinProcessBuilder};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb() {
@@ -86,12 +86,16 @@ async fn test_error_at_startup() {
 }
 
 async fn integration_test(mode: &str) -> BinProcess {
-    let mut integration_test = BinProcess::start_binary(
-        bin_path!("integration-test"),
-        "test",
-        &["--log-format", "json", "--mode", mode],
-    )
-    .await;
+    let mut integration_test = BinProcessBuilder::from_path(bin_path!("integration-test"))
+        .with_log_name(Some("test".to_owned()))
+        .with_args(vec![
+            "--log-format".to_owned(),
+            "json".to_owned(),
+            "--mode".to_owned(),
+            mode.to_owned(),
+        ])
+        .start()
+        .await;
 
     timeout(
         Duration::from_secs(30),
