@@ -20,12 +20,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Ubuntu 20.04 - Release
-            runner: ubuntu-20.04
+          - name: Ubuntu amd64 - Release
+            runner: ubuntu-24.04
             cargo_flags: --release
 
-          - name: Ubuntu 20.04 - Debug
-            runner: ubuntu-20.04
+          - name: Ubuntu amd64 - Debug
+            runner: ubuntu-24.04
             cargo_flags:
 
     name: ${{ matrix.name }}

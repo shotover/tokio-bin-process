@@ -1,9 +1,9 @@
 use std::time::Duration;
 use tokio::time::timeout;
+use tokio_bin_process::BinProcess;
 use tokio_bin_process::event::Level;
 use tokio_bin_process::event_matcher::EventMatcher;
-use tokio_bin_process::BinProcess;
-use tokio_bin_process::{bin_path, BinProcessBuilder};
+use tokio_bin_process::{BinProcessBuilder, bin_path};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb() {

@@ -1,6 +1,6 @@
 use crate::event::{Event, Fields, Level};
 use crate::event_matcher::{Count, EventMatcher, Events};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use cargo_metadata::{Metadata, MetadataCommand};
 use itertools::Itertools;
 use nix::sys::signal::Signal;
@@ -233,7 +233,9 @@ pub struct BinProcess {
 impl Drop for BinProcess {
     fn drop(&mut self) {
         if self.child.is_some() && !std::thread::panicking() {
-            panic!("Need to call either wait or shutdown_and_assert_success method on BinProcess before dropping it.");
+            panic!(
+                "Need to call either wait or shutdown_and_assert_success method on BinProcess before dropping it."
+            );
         }
     }
 }
@@ -315,7 +317,9 @@ impl BinProcess {
         binary_args: &[String],
     ) -> BinProcess {
         let log_name = if log_name.len() > 10 {
-            panic!("In order to line up in log outputs, argument log_name to BinProcess::start_with_args must be of length <= 10 but the value was: {log_name}");
+            panic!(
+                "In order to line up in log outputs, argument log_name to BinProcess::start_with_args must be of length <= 10 but the value was: {log_name}"
+            );
         } else {
             format!("{log_name: <10}") // pads log_name up to 10 chars so that it lines up properly when included in log output.
         };
@@ -420,10 +424,14 @@ impl BinProcess {
                 Some(event) => events.push(event),
                 None => {
                     if events.is_empty() {
-                        panic!("The process was terminated before the expected count of {event_count} events occured. No events received so far");
+                        panic!(
+                            "The process was terminated before the expected count of {event_count} events occured. No events received so far"
+                        );
                     } else {
                         let events_received = events.iter().map(|x| format!("{x}")).join("\n");
-                        panic!("The process was terminated before the expected count of {event_count} events occured. Events received so far:\n{events_received}");
+                        panic!(
+                            "The process was terminated before the expected count of {event_count} events occured. Events received so far:\n{events_received}"
+                        );
                     }
                 }
             }
@@ -455,7 +463,9 @@ impl BinProcess {
             .await;
 
         if status != 0 {
-            panic!("The bin process exited with {status} but expected 0 exit code (Success).\nevents:\n{events}");
+            panic!(
+                "The bin process exited with {status} but expected 0 exit code (Success).\nevents:\n{events}"
+            );
         }
 
         events
@@ -471,7 +481,9 @@ impl BinProcess {
             .await;
 
         if status == 0 {
-            panic!("The bin process exited with {status} but expected non 0 exit code (Failure).\nevents:\n{events}");
+            panic!(
+                "The bin process exited with {status} but expected non 0 exit code (Failure).\nevents:\n{events}"
+            );
         }
 
         events
@@ -495,7 +507,9 @@ impl BinProcess {
                     }
                 }
                 if !matched {
-                    panic!("Unexpected event {event}\nAny ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call.")
+                    panic!(
+                        "Unexpected event {event}\nAny ERROR or WARN events that occur in integration tests must be explicitly allowed by adding an appropriate EventMatcher to the method call."
+                    )
                 }
             }
         }
@@ -506,17 +520,23 @@ impl BinProcess {
                 Count::Any => {}
                 Count::Times(matcher_count) => {
                     if matcher_count != *count {
-                        panic!("Expected to find matches for {matcher:?}, {matcher_count} times but actually matched {count} times")
+                        panic!(
+                            "Expected to find matches for {matcher:?}, {matcher_count} times but actually matched {count} times"
+                        )
                     }
                 }
                 Count::GreaterThanOrEqual(x) => {
                     if *count < x {
-                        panic!("Expected to find matches for {matcher:?}, greater than or equal to {x} times but actually matched {count} times")
+                        panic!(
+                            "Expected to find matches for {matcher:?}, greater than or equal to {x} times but actually matched {count} times"
+                        )
                     }
                 }
                 Count::LessThanOrEqual(x) => {
                     if *count > x {
-                        panic!("Expected to find matches for {matcher:?}, less than or equal to {x} times but actually matched {count} times")
+                        panic!(
+                            "Expected to find matches for {matcher:?}, less than or equal to {x} times but actually matched {count} times"
+                        )
                     }
                 }
             }

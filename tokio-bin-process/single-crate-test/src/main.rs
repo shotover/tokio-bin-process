@@ -2,7 +2,7 @@
 // We are only testing that a single, non-workspace, crate works fine.
 
 use tokio::{
-    signal::unix::{signal, SignalKind},
+    signal::unix::{SignalKind, signal},
     sync::watch,
 };
 

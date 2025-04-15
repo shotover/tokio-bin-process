@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::time::Duration;
 use tokio::{
-    signal::unix::{signal, SignalKind},
+    signal::unix::{SignalKind, signal},
     sync::watch,
 };
 use tracing_appender::non_blocking::WorkerGuard;
