@@ -1,6 +1,6 @@
 use std::time::Duration;
-use tokio_bin_process::bin_path;
 use tokio_bin_process::BinProcessBuilder;
+use tokio_bin_process::bin_path;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cooldb_binary_name() {

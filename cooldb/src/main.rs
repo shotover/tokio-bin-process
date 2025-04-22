@@ -1,5 +1,5 @@
 use clap::Parser;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
 use tracing_appender::non_blocking::WorkerGuard;
 
